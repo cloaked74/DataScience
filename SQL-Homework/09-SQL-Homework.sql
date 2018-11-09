@@ -142,7 +142,12 @@ where rating in ('G','PG','PG-13');
 select * from rental;
 select * from inventory;
 
-select; 
+select f.title, count(*)
+from film f, rental r, inventory i
+where r.inventory_id = i.inventory_id
+and i.film_id = f.film_id
+group by f.title 
+order by 2 desc; 
 
 -- 7f. Write a query to display how much business, in dollars, each store brought in.
 select * from store;
