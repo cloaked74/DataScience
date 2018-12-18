@@ -1,0 +1,161 @@
+function showGlossary() {
+	 var dictionary = $('#dictionary');
+	 if(dictionary === undefined) {
+	 	       console.log('showGlossary use requires div#dictionary');
+	 } else {
+	 	 $.each(glossary, function( k,v ) {
+		 	var row = '<p><strong><a name="'+k+'"></a>'+v[0]+'</strong>' + ': ' + v[1] + '</p>';
+			dictionary.append(row);
+		});
+	}
+}
+
+
+// the content object does all the dirty work. it'll get the relevant words and return the indices where those words occur
+var Content = function(obj) {
+    this.guts = obj.html();
+    this.txt = obj.text();
+    this.tipsy = "";
+    this.placements = {}; // object of structure 'index':'word'
+    this.relevantWords = []; // array of relevant words found in the text
+}
+
+/**
+ * we're just compiling a list of words that are in the text so we don't have to search the entire glossary every time
+ * search will just find the first instance of the word so we don't have to look at every instance, either
+ * not until we add the tooltips
+ **/
+
+Content.prototype.getWords = function(glossary) {
+				 var checkText = this.txt.toLowerCase();
+				 var words = this.relevantWords;
+				 $.each(glossary, function( k, v ) {
+				 		  var theWord = k.toLowerCase();
+						  if( checkText.search(theWord) > -1 ) {
+						      words.push(theWord);
+						  }
+				 });
+				 return words;
+}
+
+
+// this one will make all the html easier to parse, replacing tag innards and words containing our glossary words with '_'
+Content.prototype.getCuteHtml = function() {
+	var inTag = new RegExp("<([^>])+".concat("[a-zA-Z]","([^<])+>"), "gi");	
+	var tagMatches = this.guts.match(inTag);
+	var cleaned = this.guts;
+	if(tagMatches){
+		$.each(tagMatches, function(i, v){
+			   var u = Array(v.length+1).join(" ");
+			   cleaned = cleaned.replace(v, u);
+		});
+	}
+	
+	return cleaned;		      
+}
+
+Content.prototype.getPlacement = function(needles, haystack) {
+	// we already know there are needles in the haystack, we just have to find where they are
+	var p = this.placements;
+	$.each(needles, function(i, needle) {
+		      var re = new RegExp("\\b"+needle+"\\b", "ig");
+		      var re2 = new RegExp("\\("+needle+"\\)", "ig");
+		      while ( (match = re.exec(haystack)) != null ) {
+			   p[match.index] = needle;
+		      }
+		      while ( (match = re2.exec(haystack)) != null) {
+		      	   p[match.index+1] = needle;
+		      }
+	});
+	return p;
+}
+
+
+Content.prototype.placeTags = function(show_once) {
+	var places = this.placements;
+	var tipsy = this.guts;
+	var fixPos = 0; // every time you add an indicator, you have to add this to the position of the next indicator
+	already = [];
+	$.each( places, function( place, word ) {
+		place = parseInt(place);
+		// for tags after the word
+ 		// simple span
+		var tag = '<span class="tooltip word-'+word.split(' ').join('-')+'" title=""></span>';
+		
+		// for surrounding the word
+		// var bTag = '<span class="tooltip word-'+word.split(' ').join('-')+'" title="">';
+		// var aTag = '</span>'
+
+		// surrounds the word
+		//tipsy = tipsy.substr(0, place + fixPos) + bTag + tipsy.substr(place + fixPos, word.length) + aTag + tipsy.substr(place + fixPos + word.length);
+		
+		// places tag after the word
+		if( !show_once && $.inArray(word, already) == -1 ){
+		   tipsy = tipsy.substr(0, place + fixPos + word.length) + tag + tipsy.substr(place + fixPos + word.length);
+		   fixPos = fixPos + tag.length;
+		   already.push(word);
+		}
+	});
+	this.tipsy = tipsy;
+	return tipsy;
+}
+
+Content.prototype.setupTips = function(glossary) {
+	  $.each(this.relevantWords, function( i, v ) {
+	  	 // This is for creating an information tag AFTER the word   
+		 var word = v.split(' ').join('-');
+	  	 var target = '.word-' + word;
+		 
+		// this is for surrounding the word
+		// var word = v.split(' ').join('-');
+		// var target = '.word-' + word;
+		
+	 	setTooltip( target, v.toUpperCase() + '<br>' + glossary[v][1] );
+				
+	  });
+}
+
+function setTooltip( target, content )	{
+	 $(target).tooltip({
+	    show: null, // show immediately 
+            position: { my: "center bottom-10", at: "center top" },
+            content: content, //from params
+            hide: { effect: "" }, //fadeOut
+            close: function(event, ui){
+            	   ui.tooltip.hover(
+			function () {
+                    		 $(this).stop(true).fadeTo(400, 1); 
+                	},
+                	function () {
+                    		 $(this).fadeOut("400", function(){
+                        	 			$(this).remove(); 
+                    		 })
+                	}
+            	   );
+           }
+    });
+}
+
+function showTooltips(enabled, show_once) {
+	 if(typeof show_once == 'undefined') {
+	 	   show_once = false;
+	 }
+	 var obj = $(enabled);
+	 if (obj.length > 1) {
+	    $.each(obj, function() {
+	    		runGlossary($(this), show_once);
+	    });
+	 } else {
+	   runGlossary(obj, show_once);
+	 }
+}
+
+function runGlossary(obj, show_once) {
+	 var content = new Content(obj);
+	 var words = content.getWords(glossary);
+	 var cleanHTML = content.getCuteHtml();
+	 content.getPlacement(words, cleanHTML);
+	 content.placeTags();
+	 obj.html( content.tipsy );
+ 	 content.setupTips(glossary);
+}

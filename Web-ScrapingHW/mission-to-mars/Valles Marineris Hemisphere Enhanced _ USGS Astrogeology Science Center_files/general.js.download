@@ -1,0 +1,280 @@
+// globals
+var slideSpeed = 10000;
+var animationSpeed = 2000;
+mimetypeTrans = [{name: 'application', types: ["isis", "pdf", "vnd.ms-excel","zip"]},
+		 {name: 'image', types: ["gif","jpeg","png","tiff"]},
+		 {name: 'text', types: ["csv"]}
+		];
+var mapOn = false;
+var mapsOff = false;
+
+(function($) {
+	$.fn.equalHeights = function() {
+		var max_height = 0;
+		var currentHeight = 0;
+
+		this.each(function() {
+			currentHeight = $(this).height();
+			if (currentHeight > max_height) {
+				max_height = currentHeight;
+			}
+		});
+
+		this.each(function() {
+			$(this).height(max_height);
+		});
+	};
+})(jQuery);
+
+function encode(value) {
+	value = encodeURIComponent(value);
+	return value.replace(/%20/g, "+");
+}
+
+function closeAccordians() {
+	if ($(".result-list").length === 1) {
+		$(".result-list").removeClass("closed");
+	} else {
+		$(".closed").children(".collapsible").hide();
+	}
+}
+
+
+function generateSearchQuery() {
+	var resultsPage = baseUrl + "/search/results";
+	var searchString = "";
+	var count = 0;
+	var kCount = 1;
+	$("#search-bar input[type=text], #search-bar select, #search-bar input[type=hidden], #pmiSearch input").not(".simulatedDropdown").each(function() {
+		var $this = $(this);
+		var currentVal = $this.val();
+		var currentName = $this.attr("name");
+
+		if ((currentVal !== "") && (currentName != "__ncforminfo")) {
+
+		  vals = currentVal.split(',');
+		  for (v in vals) {
+		    val = vals[v];
+
+		    searchString += (count++ == 0) ? '?' : '&';
+
+		    if (currentName == 'mimetype') {
+		      for (i in mimetypeTrans) {
+			if ($.inArray(val, mimetypeTrans[i]['types']) !== -1){
+			  val = mimetypeTrans[i]['name'] + '/' + val;
+			  break;
+			}
+		      }
+		    }
+
+		    if (currentName == "q") {
+		      searchString += currentName + "=" + encode(val);
+		    } else if (currentName == "m") {
+		      searchString += currentName + "=" + encode(val);
+		    } else {
+		      searchString += "k" + kCount + "=" + currentName + "&v" + kCount + "=" + encode(val);
+		      kCount++;
+		    }
+		  }
+		}
+	    });
+
+	if (searchString !== "") {
+	  searchString = resultsPage + searchString;
+	}
+
+	//global
+        searchQuery = searchString;
+	return searchString;
+}
+
+$(window).load(function() {
+
+        searchQuery = generateSearchQuery();
+	closeAccordians();
+
+	// new custom scrollbars, only if they're properly loaded!
+	if(jQuery().mCustomScrollbar) {
+	    $(".scroll-wrapper").mCustomScrollbar({"axis": "x",
+			"advanced":{ autoExpandHorizontalScroll: true },
+			"theme":"dark"
+		});
+	}
+
+	$(".products .item").equalHeights();
+
+	if ($(".wide-image").height() < 300) {
+		$("#wide-image-toggle").hide();
+	}
+
+	$("#advanced-search-toggle").click(function(e) {
+		e.preventDefault();
+		$(this).toggleClass("open");
+		$("#advanced-search").slideToggle(200);
+	});
+
+	$("#search-bar").submit(function(e) {
+		e.preventDefault();
+		var searchString = generateSearchQuery();
+
+		if (searchString !== "") {
+			window.location = searchString;
+		}
+	});
+
+	$("#holdings-toggle a").click(function(e) {
+		e.preventDefault();
+
+		var $this = $(this);
+		$("#holdings-toggle a").removeClass("active");
+		$this.addClass("active");
+		var current = $this.attr("href").replace("#", "");
+
+		$(".holdings").hide();
+		$(".holdings-" + current).show();
+	});
+
+	$("#wide-image-toggle").click(function(e) {
+		e.preventDefault();
+
+		var imageHeight = $(".wide-image").height();
+
+		if ($("#wide-image").hasClass("open")) {
+			$("#wide-image").removeClass("open");
+			$("#wide-image").css("max-height", imageHeight + "px");
+			open = true;
+		}
+
+		if (open === true) {
+			imageHeight = 300;
+		}
+
+		$("#wide-image").animate({"maxHeight": imageHeight}, 400, function() {
+			if (open === true) {
+				open = false;
+				$("#wide-image-toggle").text("Open");
+			} else {
+				open = true;
+				$("#wide-image-toggle").text("Close");
+			}
+		});
+	});
+
+	$("#prev,#next").click(function(e) {
+		e.preventDefault();
+
+		var uri = $(this).attr("href");
+		if (open === true || $("#wide-image").hasClass("open")) {
+			uri += "?open=true";
+		}
+
+		window.location = uri;
+	});
+
+	var menuOpen = false;
+
+	$("#nav-toggle").click(function(event) {
+		event.preventDefault();
+
+		if (menuOpen === true) {
+			$(".container").animate({
+				left: "-=85%"
+			}, 150);
+			menuOpen = false;
+		} else {
+			$(".container").animate({
+				left: "+=85%"
+			}, 150);
+			menuOpen = true;
+		}
+	});
+
+	// Start slideshow
+	if ($("#slideshow .slide").length > 1) {
+		$(".slide:first").addClass("active");
+		setInterval("slideSwitch()", slideSpeed);
+	}
+
+	$("#slideshow").height($(".slide").height() + 12);
+
+	$(window).resize(function() {
+		$("#slideshow").height($(".slide").height() + 12);
+		if (menuOpen && $(window).width() > 850) {
+			$("#container").animate({
+				left: "-=85%"
+			});
+
+			menuOpen = false;
+		}
+	});
+
+	$("#search").submit(function(e) {
+		var query = $(this).children("input[type=text]").val();
+
+  		if (query.indexOf('easter egg') !== -1) {
+                  window.open("https://astropedia.astrogeology.usgs.gov/downloadWeb/publish/astropedia/images/easter-egg-answer-lpsc-2018.jpg","_blank");
+		  return false;
+		}
+
+		e.preventDefault();
+		if (query === "") {
+			window.location = baseUrl + "/search";
+		} else {
+			window.location = baseUrl + "/search/results?q=" + encodeURIComponent(query).replace(/%20/g, "+");
+		}
+	});
+
+	$("#search input").keyup(function() {
+		$(this).addClass("active");
+	});
+
+	$("body").on("click", ".accordian", function() {
+		var $listing = $(this).parent(".result-list");
+		var section = $listing.attr("data-section");
+
+		$listing.toggleClass("closed").children(".collapsible").slideToggle(250);
+	});
+
+
+		 $("#results, .results").on("click", ".page-numbers a", function(e) {
+
+			   searchQuery = generateSearchQuery();
+			   e.preventDefault();
+			   var type = $(this).parents(".result-list").attr("data-section");
+			   $("#" + type + "-section .results").addClass("loading");
+			   $(this).parents(".page-numbers").find("a").removeClass("active");
+			   $(this).addClass("active");
+
+			   var pageNumber = $(this).text();
+			   if (searchQuery == "") {
+			     $.get(searchQuery + "?t=" + type + "&p=" + pageNumber, function(data) {
+				     $("#" + type + "-section .results").html(data).removeClass("loading");
+				     if (!mapsOff) {$('.listButton').removeClass('buttonOff');}
+			     });
+			   } else {
+			     $.get(searchQuery + "&t=" + type + "&p=" + pageNumber, function(data) {
+				     $("#" + type + "-section .results").html(data).removeClass("loading");
+				     if (!mapsOff) {$('.listButton').removeClass('buttonOff');}
+			     });
+			   }
+			 });
+
+	       });
+
+function slideSwitch() {
+	var $active = $('#slideshow .slide.active');
+
+	if ($active.length == 0) $active = $('#slideshow .slide:last');
+
+	var $next =  $active.next().length ? $active.next()
+		: $('#slideshow .slide:first');
+
+	$active.addClass('last-active');
+
+	$next.css({opacity: 0.0})
+		.addClass('active')
+		.animate({opacity: 1.0}, animationSpeed, function() {
+			$active.removeClass('active last-active');
+		});
+}
+
